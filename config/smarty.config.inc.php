@@ -229,6 +229,9 @@ function toolsConvertPrice($params, $smarty)
  * of trailing zeros beyond PS_PRICE_DISPLAY_PRECISION. This should give the
  * nicest display possible.
  *
+ * Formatting should match JavaScript function displayPriceValue (in admin.js).
+ * Which means: don't forget to transport any changes made here to there.
+ *
  * @param float|string $params['price'] Raw price in context currency.
  * @param float|string $smarty          Unused.
  *
@@ -243,7 +246,8 @@ function displayPriceValue($params, $smarty)
         $displayDecimals = Configuration::get('PS_PRICE_DISPLAY_PRECISION');
     }
 
-    $price = $params['price'];
+    // String -> float -> string gets rid of trailing zeros.
+    $price = (float) $params['price'];
     // No need for the more expensive Tools::ps_round() here.
     if ((string) $price === (string) round($price, $displayDecimals)) {
         // Price more rounded than display precision.

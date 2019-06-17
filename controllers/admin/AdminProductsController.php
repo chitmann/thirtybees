@@ -3117,12 +3117,46 @@ class AdminProductsControllerCore extends AdminController
     {
         if (Tools::getValue('key_tab') == 'Images' && Tools::getValue('submitAddproductAndStay') == 'update_legends' && Validate::isLoadedObject($product = new Product((int) Tools::getValue('id_product')))) {
             $idImage = (int) Tools::getValue('id_caption');
+            $idImages = [];
+            if ($idImage) {
+                // Caption is for one image only.
+                $idImages[] = $idImage;
+            } else {
+                // Same caption for all images.
+                $images = Image::getImages(null, $product->id);
+                foreach ($images as $image) {
+                    $idImages[] = $image['id_image'];
+                }
+            }
             $languageIds = Language::getIDs(false);
             foreach ($_POST as $key => $val) {
-                if (preg_match('/^legend_([0-9]+)/i', $key, $match)) {
+                if (preg_match('/^legend_([0-9]+)/', $key, $match)) {
                     foreach ($languageIds as $idLang) {
-                        if ($val && $idLang == $match[1]) {
-                            Db::getInstance()->execute('UPDATE '._DB_PREFIX_.'image_lang SET legend = "'.pSQL($val).'" WHERE '.($idImage ? 'id_image = '.(int) $idImage : 'EXISTS (SELECT 1 FROM '._DB_PREFIX_.'image WHERE '._DB_PREFIX_.'image.id_image = '._DB_PREFIX_.'image_lang.id_image AND id_product = '.(int) $product->id.')').' AND id_lang = '.(int) $idLang);
+                        if ($idLang == $match[1]) {
+                            foreach ($idImages as $idImage) {
+                                // Insert missing entries, update already
+                                // existing ones. As SQL features no 'insert if
+                                // missing, update otherwise', try both.
+                                Db::getInstance(_PS_USE_SQL_SLAVE_)->insert(
+                                    'image_lang',
+                                    [
+                                        'id_image'  => $idImage,
+                                        'id_lang'   => $idLang,
+                                        'legend'    => $val,
+                                    ],
+                                    false,
+                                    true,
+                                    Db::INSERT_IGNORE
+                                );
+                                Db::getInstance(_PS_USE_SQL_SLAVE_)->update(
+                                    'image_lang',
+                                    [
+                                        'legend'    => $val,
+                                    ],
+                                    '`id_image` = '.$idImage
+                                    .' AND `id_lang` = '.$idLang
+                                );
+                            }
                         }
                     }
                 }
@@ -3432,7 +3466,7 @@ class AdminProductsControllerCore extends AdminController
                 }
 
                 // adding button for preview this product statistics
-                if (file_exists(_PS_MODULE_DIR_.'statsmodule/stats/statsproduct.php')) {
+                if (Module::isEnabled('statsdata')) {
                     $this->page_header_toolbar_btn['stats'] = [
                         'short' => $this->l('Statistics', null, null, false),
                         'href'  => $this->context->link->getAdminLink('AdminStats').'&module=statsproduct&id_product='.(int) $product->id,
@@ -3810,7 +3844,7 @@ class AdminProductsControllerCore extends AdminController
         if ($obj->id) {
             $shops = Shop::getShops();
             $countries = Country::getCountries($this->context->language->id);
-            $groups = Group::getGroups($this->context->language->id);
+            $groups = Group::getGroups($this->context->language->id, true);
             $currencies = Currency::getCurrencies();
             $attributes = $obj->getAttributesGroups((int) $this->context->language->id);
             $combinations = [];
@@ -4932,14 +4966,7 @@ class AdminProductsControllerCore extends AdminController
 
                 $data->assign('shops', $shops);
 
-                $countImages = Db::getInstance()->getValue(
-                    '
-					SELECT COUNT(id_product)
-					FROM '._DB_PREFIX_.'image
-					WHERE id_product = '.(int) $obj->id
-                );
-
-                $images = Image::getImages($this->context->language->id, $obj->id);
+                $images = Image::getImages(null, $obj->id);
                 foreach ($images as $k => $image) {
                     $images[$k] = new Image($image['id_image']);
                 }
@@ -4957,7 +4984,7 @@ class AdminProductsControllerCore extends AdminController
 
                 $data->assign(
                     [
-                        'countImages'         => $countImages,
+                        'countImages'         => count($images),
                         'id_product'          => (int) Tools::getValue('id_product'),
                         'id_category_default' => (int) $this->_category->id,
                         'images'              => $images,
@@ -5420,7 +5447,7 @@ class AdminProductsControllerCore extends AdminController
                         'associated_suppliers'            => $associated_suppliers,
                         'associated_suppliers_collection' => $product_supplier_collection,
                         'product_designation'             => $product_designation,
-                        'currencies'                      => Currency::getCurrencies(),
+                        'currencies'                      => Currency::getCurrencies(false, true, true),
                         'product'                         => $obj,
                         'link'                            => $this->context->link,
                         'token'                           => $this->token,

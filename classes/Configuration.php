@@ -38,6 +38,7 @@ class ConfigurationCore extends ObjectModel
 {
     // Default configuration consts
     // @since 1.0.1
+    // Benefit of these constants unclear. --Traumflug 2018-12-18
     const SEARCH_INDEXATION = 'PS_SEARCH_INDEXATION';
     const ONE_PHONE_AT_LEAST = 'PS_ONE_PHONE_AT_LEAST';
     const GROUP_FEATURE_ACTIVE = 'PS_GROUP_FEATURE_ACTIVE';
@@ -267,6 +268,7 @@ class ConfigurationCore extends ObjectModel
     const CUSTOMCODE_JS = 'TB_CUSTOMCODE_JS';
     const CUSTOMCODE_ORDERCONF_JS = 'TB_CUSTOMCODE_ORDERCONF_JS';
     const STORE_REGISTERED = 'TB_STORE_REGISTERED';
+    const MAIL_SUBJECT_TEMPLATE = 'TB_MAIL_SUBJECT_TEMPLATE';
     // @codingStandardsIgnoreStart
     /**
      * @see ObjectModel::$definition
@@ -361,24 +363,6 @@ class ConfigurationCore extends ObjectModel
      */
     public static function get($key, $idLang = null, $idShopGroup = null, $idShop = null)
     {
-        return static::getWithDefault($key, false, $idLang, $idShopGroup, $idShop);
-    }
-
-    /**
-     * Returns single configuration value, or fallback value if not configuration key does not exist
-     *
-     * @param string $key Key wanted
-     * @param mixed $fallback fallback value
-     * @param int $idLang Language ID
-     * @param int|null $idShopGroup
-     * @param int|null $idShop
-     *
-     * @return mixed Value
-     *
-     * @throws PrestaShopException
-     */
-    public static function getWithDefault($key, $fallback, $idLang = null, $idShopGroup = null, $idShop = null)
-    {
         if (defined('_PS_DO_NOT_LOAD_CONFIGURATION_') && _PS_DO_NOT_LOAD_CONFIGURATION_) {
             return false;
         }
@@ -408,7 +392,7 @@ class ConfigurationCore extends ObjectModel
             return static::$_cache[static::$definition['table']][$idLang]['global'][$key];
         }
 
-        return $fallback;
+        return false;
     }
 
     /**

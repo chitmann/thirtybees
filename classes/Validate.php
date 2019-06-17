@@ -64,7 +64,7 @@ class ValidateCore
     }
 
     /**
-     * Check for e-mail validity
+     * Check for e-mail validity. See also validate_isEmail() in js/validate.js.
      *
      * @param string $email e-mail address to validate
      *
@@ -232,7 +232,8 @@ class ValidateCore
     }
 
     /**
-     * Check for name validity
+     * Check for name validity. This should match validate_isName() in
+     * js/validate.js.
      *
      * @param string $name Name to validate
      *
@@ -240,10 +241,16 @@ class ValidateCore
      *
      * @since   1.0.0
      * @version 1.0.0 Initial version
+     * @version 1.1.0 Accept ',', don't accept 'http', 'www' and some more
+     *                unusual/risky characters.
      */
     public static function isName($name)
     {
-        return (bool) preg_match(Tools::cleanNonUnicodeSupport('/^[^0-9!<>,;?()@"°{}_$%:]*$/u'), stripslashes($name));
+        return ! preg_match('/www|http/ui', $name)
+            && preg_match(
+                Tools::cleanNonUnicodeSupport('/^[^0-9!\[\]<>;?=+()@#"°{}_$%:\\\*\^]*$/u'),
+                $name
+            );
     }
 
     /**
@@ -473,7 +480,8 @@ class ValidateCore
     }
 
     /**
-     * Check for a message validity
+     * Check for a message validity. This should match validate_isMessage() in
+     * js/validate.js.
      *
      * @param string $message Message to validate
      *
@@ -484,7 +492,7 @@ class ValidateCore
      */
     public static function isMessage($message)
     {
-        return !preg_match('/[<>{}]/i', $message);
+        return (bool) preg_match('/^[^<>{}]+$/', $message);
     }
 
     /**
@@ -543,7 +551,8 @@ class ValidateCore
     }
 
     /**
-     * Check for a postal address validity
+     * Check for a postal address validity. This should match
+     * validate_isAddress() in js/validate.js.
      *
      * @param string $address Address to validate
      *
@@ -554,11 +563,12 @@ class ValidateCore
      */
     public static function isAddress($address)
     {
-        return empty($address) || preg_match(Tools::cleanNonUnicodeSupport('/^[^!<>?=+@{}_$%]*$/u'), $address);
+        return empty($address) || preg_match(Tools::cleanNonUnicodeSupport('/^[^!<>?=+@{}_$%]+$/u'), $address);
     }
 
     /**
-     * Check for city name validity
+     * Check for city name validity. This should match validate_isCityName() in
+     * js/validate.js.
      *
      * @param string $city City name to validate
      *
@@ -569,7 +579,7 @@ class ValidateCore
      */
     public static function isCityName($city)
     {
-        return (bool) preg_match(Tools::cleanNonUnicodeSupport('/^[^!<>;?=+@#"°{}_$%]*$/u'), $city);
+        return (bool) preg_match(Tools::cleanNonUnicodeSupport('/^[^!<>;?=+@#"°{}_$%]+$/u'), $city);
     }
 
     /**
@@ -647,7 +657,8 @@ class ValidateCore
     }
 
     /**
-     * Check for password validity
+     * Check for password validity. See also validate_isPasswd() in
+     * js/validate.js.
      *
      * @param string $plainTextPassword Password to validate
      * @param int    $size
@@ -786,7 +797,7 @@ class ValidateCore
      */
     public static function isPhoneNumber($number)
     {
-        return (bool) preg_match('/^[+0-9. ()-]*$/', $number);
+        return (bool) preg_match('/^[+0-9. ()-]+$/', $number);
     }
 
     /**
@@ -820,7 +831,8 @@ class ValidateCore
     }
 
     /**
-     * Check for postal code validity
+     * Check for postal code validity. See also validate_isPostCode() in
+     * js/validate.js.
      *
      * @param string $postcode Postal code to validate
      *
@@ -1081,6 +1093,10 @@ class ValidateCore
      */
     public static function isUrl($url)
     {
+        if (! is_string($url)) {
+           return false;
+        }
+
         if (!static::isAbsoluteUrl($url)) {
             return (bool) preg_match(Tools::cleanNonUnicodeSupport('/^[~:#,$%&_=\(\)\.\? \+\-@\/a-zA-Z0-9\pL\pS-]+$/u'), $url);
         }
@@ -1202,7 +1218,8 @@ class ValidateCore
     }
 
     /**
-     * Check for standard name validity
+     * Check for standard name validity. This should match
+     * validate_isGenericName() in js/validate.js.
      *
      * @param string $name Name to validate
      *
@@ -1310,7 +1327,7 @@ class ValidateCore
      */
     public static function isDniLite($dni)
     {
-        return empty($dni) || (bool) preg_match('/^[0-9A-Za-z-.]{1,16}$/U', $dni);
+        return empty($dni) || preg_match('/^[0-9A-Za-z-.]{1,16}$/U', $dni);
     }
 
     /**

@@ -526,7 +526,7 @@ class AdminImagesControllerCore extends AdminController
             $this->errors[] = $e->getMessage();
         }
         $indexationStatus = $this->getIndexationStatus();
-        if (!$indexationStatus || !array_sum(array_column('indexed', array_values($indexationStatus)))) {
+        if (!$indexationStatus || !array_sum(array_column(array_values($indexationStatus), 'indexed'))) {
             // First run, regenerate no picture images, too
             $process = array(
                 'categories'    => _PS_CAT_IMG_DIR_,
@@ -811,7 +811,12 @@ class AdminImagesControllerCore extends AdminController
                 }
                 if (!file_exists($newFile)) {
                     if (!file_exists($dir.$image) || !filesize($dir.$image)) {
-                        $this->errors[] = sprintf($this->l('Source file for type %s and ID %s does not exist', $entityType, $idEntity));
+                        $this->errors[] = sprintf(
+                            $this->l('Source file for %s id %s does not exist: %s'),
+                            $entityType,
+                            $idEntity,
+                            str_replace(_PS_ROOT_DIR_, '', $dir.$image)
+                        );
                     } else {
                         $success = ImageManager::resize(
                             $dir.$image,

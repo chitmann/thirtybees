@@ -270,7 +270,11 @@ class ToolsCore
      */
     public static function strReplaceFirst($search, $replace, $subject, $cur = 0)
     {
-        return (strpos($subject, $search, $cur)) ? substr_replace($subject, $replace, (int) strpos($subject, $search, $cur), strlen($search)) : $subject;
+        $pos = strpos($subject, $search, $cur);
+        if ($pos !== false) {
+            return substr_replace($subject, $replace, $pos, strlen($search));
+        }
+        return $subject;
     }
 
     /**
@@ -583,16 +587,35 @@ class ToolsCore
      *
      * @return mixed Value
      *
-     * @since   1.0.0
-     * @version 1.0.0 Initial version
+     * @since   1.1.0
+     * @version 1.1.0 Initial version
      */
-    public static function getValue($key, $defaultValue = false)
+    public static function getValueRaw($key, $defaultValue = false)
     {
         if (!isset($key) || empty($key) || !is_string($key)) {
             return false;
         }
 
-        $ret = (isset($_POST[$key]) ? $_POST[$key] : (isset($_GET[$key]) ? $_GET[$key] : $defaultValue));
+        return (isset($_POST[$key]) ? $_POST[$key] : (isset($_GET[$key]) ? $_GET[$key] : $defaultValue));
+    }
+
+    /**
+     * Get a value from $_POST / $_GET
+     * if unavailable, take a default value
+     *
+     * This method performs basic sanitization of input value
+     *
+     * @param string $key          Value key
+     * @param mixed  $defaultValue (optional)
+     *
+     * @return mixed Value
+     *
+     * @since   1.0.0
+     * @version 1.0.0 Initial version
+     */
+    public static function getValue($key, $defaultValue = false)
+    {
+        $ret = static::getValueRaw($key, $defaultValue);
 
         if (is_string($ret)) {
             return stripslashes(urldecode(preg_replace('/((\%5C0+)|(\%00+))/i', '', urlencode($ret))));
@@ -783,7 +806,10 @@ class ToolsCore
     }
 
     /**
-     * Return price with currency sign for a given product
+     * Return a formatted price string, with currency sign.
+     *
+     * Formatting should match JavaScript function displayPrice (in tools.js).
+     * Which means: don't forget to transport any changes made here to there.
      *
      * @param float        $price      Product price
      * @param object|array $tbCurrency Current (thirty bees) Currency
@@ -792,7 +818,6 @@ class ToolsCore
      * @param null|bool    $auto
      *
      * @return string Price correctly formatted (sign, decimal separator...)
-     * if you modify this function, don't forget to modify the Javascript function formatCurrency (in tools.js)
      *
      * @since   1.0.0
      * @version 1.0.0 Initial version
@@ -1929,13 +1954,16 @@ class ToolsCore
         if (defined('_PS_MODE_DEV_') && _PS_MODE_DEV_ && $string == 'Fatal error') {
             return ('<pre>'.print_r(debug_backtrace(), true).'</pre>');
         }
-        if (!is_array($_ERRORS)) {
-            return $htmlentities ? Tools::htmlentitiesUTF8($string) : $string;
-        }
-        $key = md5(str_replace('\'', '\\\'', $string));
-        $str = (isset($_ERRORS) && is_array($_ERRORS) && array_key_exists($key, $_ERRORS)) ? $_ERRORS[$key] : $string;
 
-        return $htmlentities ? Tools::htmlentitiesUTF8(stripslashes($str)) : $str;
+        $key = md5(str_replace('\'', '\\\'', $string));
+        if (isset($_ERRORS)
+            && is_array($_ERRORS)
+            && array_key_exists($key, $_ERRORS)
+            && $_ERRORS[$key] !== '') {
+            $string = $_ERRORS[$key];
+        }
+
+        return $htmlentities ? Tools::htmlentitiesUTF8(stripslashes($string)) : $string;
     }
 
     /**
@@ -3156,7 +3184,7 @@ class ToolsCore
         $specific_before = $specific_after = '';
         if (file_exists($path)) {
             if (static::isSubmit('htaccess')) {
-                $content = static::getValue('htaccess');
+                $content = $_POST['htaccess'];
             } else {
                 $content = file_get_contents($path);
             }

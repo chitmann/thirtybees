@@ -110,7 +110,7 @@ $(document).ready(function () {
 	Customer.init();
 });
 </script>
-{capture assign=priceDisplayPrecisionFormat}{'%.'|cat:$smarty.const._PS_PRICE_DISPLAY_PRECISION_|cat:'f'}{/capture}
+
 <div id="product-prices" class="panel product-tab">
 	<input type="hidden" name="submitted_tabs[]" value="Prices" />
 	<h3>{l s='Product price'}</h3>
@@ -126,9 +126,21 @@ $(document).ready(function () {
 		<div class="col-lg-2">
 			<div class="input-group">
 				<span class="input-group-addon">{$currency->prefix}{$currency->suffix}</span>
-				<input maxlength="27" name="wholesale_price" id="wholesale_price" type="text" value="{{toolsConvertPrice price=$product->wholesale_price}|string_format:$priceDisplayPrecisionFormat}" onchange="this.value = this.value.replace(/,/g, '.');" />
+                <input type="text"
+                    id="wholesale_price"
+                    name="wholesale_price"
+                    value="{displayPriceValue price=$product->wholesale_price}"
+                    onkeyup="if (isArrowKey(event)) return;
+                             this.value = this.value.replace(/,/g, '.');"
+                />
 			</div>
-			{if isset($pack) && $pack->isPack($product->id)}<p class="help-block">{l s='The sum of wholesale prices of the products in the pack is %s%s%s' sprintf=[$currency->prefix,{toolsConvertPrice price=$pack->noPackWholesalePrice($product->id)|string_format:$priceDisplayPrecisionFormat},$currency->suffix]}</p>{/if}
+            {if isset($pack) && $pack->isPack($product->id)}
+                <p class="help-block">
+                    {l s='The sum of wholesale prices of the products in the pack is'}
+                    {displayPrice price=$pack->noPackWholesalePrice($product->id)
+                                  currency=$currency->id}
+                </p>
+            {/if}
 		</div>
 	</div>
 	<div class="form-group">
@@ -139,8 +151,22 @@ $(document).ready(function () {
 		<div class="col-lg-2">
 			<div class="input-group">
 				<span class="input-group-addon">{$currency->prefix}{$currency->suffix}</span>
-				<input type="hidden" id="priceTEReal" name="price" value="{toolsConvertPrice price=$product->price}"/>
-				<input size="11" maxlength="27" id="priceTE" name="price_displayed" type="text" value="{{toolsConvertPrice price=$product->price}|string_format:'%.6f'}" onchange="noComma('priceTE'); $('#priceTEReal').val(this.value);" onkeyup="$('#priceType').val('TE'); $('#priceTEReal').val(this.value.replace(/,/g, '.')); if (isArrowKey(event)) return; calcPriceTI();" />
+                <input type="hidden"
+                    id="priceTEReal"
+                    name="price"
+                    value="{displayPriceValue price=$product->price}"
+                />
+                <input type="text"
+                    id="priceTE"
+                    name="price_displayed"
+                    value="{displayPriceValue price=$product->price}"
+                    onchange="$('#priceTEReal').val(this.value);"
+                    onkeyup="if (isArrowKey(event)) return;
+                             this.value = this.value.replace(/,/g, '.');
+                             $('#priceType').val('TE');
+                             $('#priceTEReal').val(this.value);
+                             calcPriceTI();"
+                />
 			</div>
 		</div>
 	</div>
@@ -195,7 +221,15 @@ $(document).ready(function () {
 		</label>
 		<div class="input-group col-lg-2">
 			<span class="input-group-addon">{$currency->prefix}{$currency->suffix}</span>
-			<input maxlength="27" id="ecotax" name="ecotax" type="text" value="{$product->ecotax|string_format:$priceDisplayPrecisionFormat}" onkeyup="$('#priceType').val('TI');if (isArrowKey(event))return; calcPriceTE(); this.value = this.value.replace(/,/g, '.'); if (parseInt(this.value) > getE('priceTE').value) this.value = getE('priceTE').value; if (isNaN(this.value)) this.value = 0;" />
+            <input type="text"
+                id="ecotax"
+                name="ecotax"
+                value="{displayPriceValue price=$product->ecotax}"
+                onkeyup="if (isArrowKey(event)) return;
+                         this.value = this.value.replace(/,/g, '.');
+                         $('#priceType').val('TI');
+                         calcPriceTE();"
+            />
 		</div>
 	</div>
 	<div class="form-group" {if !$country_display_tax_label || $tax_exclude_taxe_option}style="display:none;"{/if} >
@@ -203,9 +237,23 @@ $(document).ready(function () {
 		<div class="input-group col-lg-2">
 			<span class="input-group-addon">{$currency->prefix}{$currency->suffix}</span>
 			<input id="priceType" name="priceType" type="hidden" value="TE" />
-			<input id="priceTI" name="priceTI" type="text" value="" onchange="noComma('priceTI');" maxlength="27" onkeyup="$('#priceType').val('TI');if (isArrowKey(event)) return;  calcPriceTE();" />
+            <input type="text"
+                id="priceTI"
+                name="priceTI"
+                value=""
+                onkeyup="if (isArrowKey(event)) return;
+                         this.value = this.value.replace(/,/g, '.');
+                         $('#priceType').val('TI');
+                         calcPriceTE();"
+            />
 		</div>
-		{if isset($pack) && $pack->isPack($product->id)}<p class="col-lg-9 col-lg-offset-3 help-block">{l s='The sum of prices of the products in the pack is %s%s%s' sprintf=[$currency->prefix,{toolsConvertPrice price=$pack->noPackPrice($product->id)|string_format:$priceDisplayPrecisionFormat},$currency->suffix]}</p>{/if}
+        {if isset($pack) && $pack->isPack($product->id)}
+            <p class="col-lg-9 col-lg-offset-3 help-block">
+                {l s='The sum of prices of the products in the pack is'}
+                {displayPrice price=$pack->noPackPrice($product->id)
+                              currency=$currency->id}
+            </p>
+        {/if}
 	</div>
 
 	<div class="form-group">
@@ -216,7 +264,14 @@ $(document).ready(function () {
 		<div class="col-lg-4">
 			<div class="input-group">
 				<span class="input-group-addon">{$currency->prefix}{$currency->suffix}</span>
-				<input id="unit_price" name="unit_price" type="text" value="{$unit_price|string_format:'%.6f'}" maxlength="27" onkeyup="if (isArrowKey(event)) return ;this.value = this.value.replace(/,/g, '.'); unitPriceWithTax('unit');"/>
+                <input type="text"
+                    id="unit_price"
+                    name="unit_price"
+                    value="{displayPriceValue price=$unit_price}"
+                    onkeyup="if (isArrowKey(event)) return;
+                             this.value = this.value.replace(/,/g, '.');
+                             unitPriceWithTax('unit');"
+                />
 				<span class="input-group-addon">{l s='per'}</span>
 				<input id="unity" name="unity" type="text" value="{$product->unity|htmlentitiesUTF8}"  maxlength="255" onkeyup="if (isArrowKey(event)) return ;unitySecond();" onchange="unitySecond();"/>
 			</div>
@@ -410,7 +465,14 @@ $(document).ready(function () {
 						<div class="col-lg-4">
 							<div class="input-group">
 								<span class="input-group-addon">{$currency->prefix}{$currency->suffix}</span>
-								<input type="text" disabled="disabled" name="sp_price" id="sp_price" value="{$product->price|string_format:$priceDisplayPrecisionFormat}" />
+                                <input type="text"
+                                    id="sp_price"
+                                    name="sp_price"
+                                    value="{displayPriceValue price=$product->price}"
+                                    onkeyup="if (isArrowKey(event)) return;
+                                             this.value = this.value.replace(/,/g, '.');"
+                                    disabled="disabled"
+                                />
 							</div>
 							<p class="checkbox">
 								<label for="leave_bprice">{l s='Leave base price:'}</label>
