@@ -65,8 +65,6 @@ class AdminTranslationsControllerCore extends AdminController
     protected $type_selected;
     /** @var Language $lang_selected Language for the selected language */
     protected $lang_selected;
-    /** @var bool $post_limit_exceed Is true if number of var exceed the suhosin request or post limit */
-    protected $post_limit_exceed = false;
     // @codingStandardsIgnoreEnd
 
     /**
@@ -178,7 +176,6 @@ class AdminTranslationsControllerCore extends AdminController
             'title'               => $title,
             'type'                => $this->type_selected,
             'theme'               => $this->theme_selected,
-            'post_limit_exceeded' => $this->post_limit_exceed,
             'url_submit'          => static::$currentIndex.'&submitTranslations'.ucfirst($this->type_selected).'=1&token='.$this->token,
             'toggle_button'       => $this->displayToggleButton(),
             'textarea_sized'      => AdminTranslationsControllerCore::TEXTAREA_SIZED,
@@ -208,7 +205,7 @@ class AdminTranslationsControllerCore extends AdminController
             var openAll = \''.html_entity_decode($this->l('Expand all fieldsets'), ENT_NOQUOTES, 'UTF-8').'\';
             var closeAll = \''.html_entity_decode($this->l('Close all fieldsets'), ENT_NOQUOTES, 'UTF-8').'\';
         </script>
-        <button type="button" class="btn btn-default" id="buttonall" data-status="open" onclick="toggleDiv(\''.$this->type_selected.'_div\', $(this).data(\'status\')); toggleButtonValue(this.id, openAll, closeAll);"><i class="process-icon-compress"></i> <span>'.$this->l('Close all fieldsets').'</span></button>';
+        <button type="button" class="btn btn-default" id="buttonall" data-status="close" onclick="toggleDiv(\''.$this->type_selected.'_div\', $(this).data(\'status\')); toggleButtonValue(this.id, openAll, closeAll);"><i class="process-icon-expand"></i> <span>'.$this->l('Expand all fieldsets').'</span></button>';
 
         return $strOutput;
     }
@@ -403,12 +400,12 @@ class AdminTranslationsControllerCore extends AdminController
                     if ($modules = $this->getListModules()) {
                         // Get files of all modules
                         $arrFiles = $this->getAllModuleFiles($modules, null, $this->lang_selected->iso_code, true);
-
                         // Find and write all translation modules files
                         foreach ($arrFiles as $value) {
-                            $this->findAndWriteTranslationsIntoFile($value['file_name'], $value['files'], $value['theme'], $value['module'], $value['dir']);
+                            if($_POST['module_name'] == $value['module']) {
+                                $this->findAndWriteTranslationsIntoFile($value['file_name'], $value['files'], $value['theme'], $value['module'], $value['dir']);
+                            }
                         }
-
                         // Clear modules cache
                         Tools::clearCache();
 
@@ -1315,51 +1312,65 @@ class AdminTranslationsControllerCore extends AdminController
         $thmName = str_replace('.', '', Tools::getValue('theme'));
         $kpiKey = substr(strtoupper($thmName.'_'.Tools::getValue('lang')), 0, 16);
 
-        if ($fd = fopen($filePath, 'w')) {
-            // Get value of button save and stay
-            $saveAndStay = Tools::isSubmit('submitTranslations'.$type.'AndStay');
+        require_once $filePath;
+        $translationsArray = $GLOBALS[$translationInformation['var']];
+        $saveAndStay = Tools::isSubmit('submitTranslations'.$type.'AndStay');
 
-            // Get language
-            $lang = strtolower(Tools::getValue('lang'));
+        // Unset all POST which are not translations
+        unset(
+            $_POST['submitTranslations'.$type],
+            $_POST['submitTranslations'.$type.'AndStay'],
+            $_POST['lang'],
+            $_POST['token'],
+            $_POST['theme'],
+            $_POST['type']
+        );
 
-            // Unset all POST which are not translations
-            unset(
-                $_POST['submitTranslations'.$type],
-                $_POST['submitTranslations'.$type.'AndStay'],
-                $_POST['lang'],
-                $_POST['token'],
-                $_POST['theme'],
-                $_POST['type']
-            );
-
-            // Get all POST which aren't empty
-            $toInsert = [];
-            foreach ($_POST as $key => $value) {
-                if (!empty($value)) {
-                    $toInsert[$key] = $value;
+        // To deal with vanished translations, remove all translations
+        // belonging to the saved panel before adding the ones POSTed.
+        $keyBase = array_keys($_POST)[0];
+        if ($keyBase) {
+            $keyBase = substr($keyBase, 0, strrpos($keyBase, '_'));
+            foreach (array_keys($translationsArray) as $key) {
+                if (strpos($key, $keyBase) === 0 /* start of string! */) {
+                    unset($translationsArray[$key]);
                 }
+            }
+        }
+
+        // Get all POST which aren't empty
+        foreach ($_POST as $key => $value) {
+            if (!empty($value)) {
+                $translationsArray[$key] = $value;
+            }
+        }
+
+        // translations array is ordered by key (easy merge)
+        ksort($translationsArray);
+        $varName = $translationInformation['var'];
+        $result = file_put_contents(
+            $filePath,
+            "<?php\n\n"
+            ."global \$${varName};\n\n"
+            ."\$${varName} = ".var_export($translationsArray, true).";\n\n"
+            ."return \$${varName};\n"
+        );
+        if ($result !== false) {
+            if (function_exists('opcache_invalidate')) {
+                opcache_invalidate($filePath);
             }
 
             ConfigurationKPI::updateValue('FRONTOFFICE_TRANSLATIONS_EXPIRE', time());
-            ConfigurationKPI::updateValue('TRANSLATE_TOTAL_'.$kpiKey, count($_POST));
-            ConfigurationKPI::updateValue('TRANSLATE_DONE_'.$kpiKey, count($toInsert));
+            ConfigurationKPI::updateValue(
+                'TRANSLATE_TOTAL_'.$kpiKey,
+                count($translationsArray)
+            );
+            ConfigurationKPI::updateValue(
+                'TRANSLATE_DONE_'.$kpiKey,
+                count($translationsArray)
+            );
 
-            // translations array is ordered by key (easy merge)
-            ksort($toInsert);
-            $tab = $translationInformation['var'];
-            fwrite($fd, "<?php\n\nglobal \$".$tab.";\n\$".$tab." = array();\n");
-            foreach ($toInsert as $key => $value) {
-                fwrite($fd, '$'.$tab.'[\''.pSQL($key, true).'\'] = \''.pSQL($value, true).'\';'."\n");
-            }
-            fwrite($fd, "\n?>");
-            fclose($fd);
-
-            // Redirect
-            if ($saveAndStay) {
-                $this->redirect(true);
-            } else {
-                $this->redirect();
-            }
+            $this->redirect((bool) $saveAndStay);
         } else {
             throw new PrestaShopException(sprintf(Tools::displayError('Cannot write this file: "%s"'), $filePath));
         }
@@ -1782,6 +1793,9 @@ class AdminTranslationsControllerCore extends AdminController
 
         if (isset($cacheFile[$themeName.'-'.$fileName]) && $strWrite != "<?php\n\nglobal \$_MODULE;\n\$_MODULE = array();\n") {
             file_put_contents($fileName, $strWrite);
+            if (function_exists('opcache_invalidate')) {
+                opcache_invalidate($fileName);
+            }
         }
     }
 
@@ -1836,6 +1850,8 @@ class AdminTranslationsControllerCore extends AdminController
                 if ($typeFile == 'php') {
                     $regex = [
                         '/HTMLTemplate.*::l\((\')'._PS_TRANS_PATTERN_.'\'[\)|\,]/U',
+                        '/static::l\((\')'._PS_TRANS_PATTERN_.'\'[\)|\,]/U',
+                        '/Translate::getPdfTranslation\((\')'._PS_TRANS_PATTERN_.'\'(?:,.*)*\)/U',
                         '/->l\((\')'._PS_TRANS_PATTERN_.'\'(, ?\'(.+)\')?(, ?(.+))?\)/U',
                     ];
                 } else {
@@ -1950,7 +1966,6 @@ class AdminTranslationsControllerCore extends AdminController
                 'missing_translations' => $missingTranslationsFront,
                 'count'                => $count,
                 'cancel_url'           => $this->context->link->getAdminLink('AdminTranslations'),
-                'limit_warning'        => $this->displayLimitPostWarning($count),
                 'mod_security_warning' => Tools::apacheModExists('mod_security'),
                 'tabsArray'            => $tabsArray,
             ]
@@ -2237,19 +2252,9 @@ class AdminTranslationsControllerCore extends AdminController
      */
     public function displayLimitPostWarning($count)
     {
-        $return = [];
-        if ((ini_get('suhosin.post.max_vars') && ini_get('suhosin.post.max_vars') < $count) || (ini_get('suhosin.request.max_vars') && ini_get('suhosin.request.max_vars') < $count)) {
-            $return['error_type'] = 'suhosin';
-            $return['post.max_vars'] = ini_get('suhosin.post.max_vars');
-            $return['request.max_vars'] = ini_get('suhosin.request.max_vars');
-            $return['needed_limit'] = $count + 100;
-        } elseif (ini_get('max_input_vars') && ini_get('max_input_vars') < $count) {
-            $return['error_type'] = 'conf';
-            $return['max_input_vars'] = ini_get('max_input_vars');
-            $return['needed_limit'] = $count + 100;
-        }
+        Tools::displayAsDeprecated('Limit Post Warning is no longer used, now translating each panel separately.');
 
-        return $return;
+        return [];
     }
 
     /**
@@ -2474,7 +2479,6 @@ class AdminTranslationsControllerCore extends AdminController
             [
                 'count'                => $count,
                 'cancel_url'           => $this->context->link->getAdminLink('AdminTranslations'),
-                'limit_warning'        => $this->displayLimitPostWarning($count),
                 'mod_security_warning' => Tools::apacheModExists('mod_security'),
                 'tabsArray'            => $tabsArray,
                 'missing_translations' => $missingTranslationsBack,
@@ -2545,7 +2549,6 @@ class AdminTranslationsControllerCore extends AdminController
             [
                 'count'                => count($stringToTranslate),
                 'cancel_url'           => $this->context->link->getAdminLink('AdminTranslations'),
-                'limit_warning'        => $this->displayLimitPostWarning(count($stringToTranslate)),
                 'mod_security_warning' => Tools::apacheModExists('mod_security'),
                 'errorsArray'          => $stringToTranslate,
                 'missing_translations' => $countEmpty,
@@ -2570,7 +2573,6 @@ class AdminTranslationsControllerCore extends AdminController
         $nameVar = $this->translations_informations[$this->type_selected]['var'];
         $GLOBALS[$nameVar] = $this->fileExists();
         $missingTranslationsFields = [];
-        $classArray = [];
         $tabsArray = [];
         $count = 0;
 
@@ -2593,46 +2595,24 @@ class AdminTranslationsControllerCore extends AdminController
                 if (!is_subclass_of($className.'Core', 'ObjectModel')) {
                     continue;
                 }
-                $classArray[$className] = call_user_func([$className, 'getValidationRules'], $className);
-            }
-        }
-        foreach ($classArray as $prefixKey => $rules) {
-            if (isset($rules['validate'])) {
-                foreach ($rules['validate'] as $key => $value) {
-                    if (isset($GLOBALS[$nameVar][$prefixKey.'_'.md5($key)])) {
-                        $tabsArray[$prefixKey][$key]['trad'] = html_entity_decode($GLOBALS[$nameVar][$prefixKey.'_'.md5($key)], ENT_COMPAT, 'UTF-8');
-                        $count++;
-                    } else {
-                        if (!isset($tabsArray[$prefixKey][$key]['trad'])) {
-                            $tabsArray[$prefixKey][$key]['trad'] = '';
-                            if (!isset($missingTranslationsFields[$prefixKey])) {
-                                $missingTranslationsFields[$prefixKey] = 1;
+                $definition = ObjectModel::getDefinition($className);
+                if (isset($definition['fields'])) {
+                    foreach ($definition['fields'] as $key => $fieldDefinition) {
+                        if (isset($fieldDefinition['validate'])) {
+                            if (isset($GLOBALS[$nameVar][$className . '_' . md5($key)])) {
+                                $tabsArray[$className][$key]['trad'] = html_entity_decode($GLOBALS[$nameVar][$className . '_' . md5($key)], ENT_COMPAT, 'UTF-8');
+                                $count++;
                             } else {
-                                $missingTranslationsFields[$prefixKey]++;
+                                if (!isset($tabsArray[$className][$key]['trad'])) {
+                                    $tabsArray[$className][$key]['trad'] = '';
+                                    if (!isset($missingTranslationsFields[$className])) {
+                                        $missingTranslationsFields[$className] = 1;
+                                    } else {
+                                        $missingTranslationsFields[$className]++;
+                                    }
+                                    $count++;
+                                }
                             }
-                            $count++;
-                        }
-                    }
-                }
-            }
-            if (isset($rules['validateLang'])) {
-                foreach ($rules['validateLang'] as $key => $value) {
-                    if (isset($GLOBALS[$nameVar][$prefixKey.'_'.md5($key)])) {
-                        $tabsArray[$prefixKey][$key]['trad'] = '';
-                        if (array_key_exists($prefixKey.'_'.md5(addslashes($key)), $GLOBALS[$nameVar])) {
-                            $tabsArray[$prefixKey][$key]['trad'] = html_entity_decode($GLOBALS[$nameVar][$prefixKey.'_'.md5(addslashes($key))], ENT_COMPAT, 'UTF-8');
-                        }
-
-                        $count++;
-                    } else {
-                        if (!isset($tabsArray[$prefixKey][$key]['trad'])) {
-                            $tabsArray[$prefixKey][$key]['trad'] = '';
-                            if (!isset($missingTranslationsFields[$prefixKey])) {
-                                $missingTranslationsFields[$prefixKey] = 1;
-                            } else {
-                                $missingTranslationsFields[$prefixKey]++;
-                            }
-                            $count++;
                         }
                     }
                 }
@@ -2643,7 +2623,6 @@ class AdminTranslationsControllerCore extends AdminController
             $this->tpl_view_vars,
             [
                 'count'                => $count,
-                'limit_warning'        => $this->displayLimitPostWarning($count),
                 'mod_security_warning' => Tools::apacheModExists('mod_security'),
                 'tabsArray'            => $tabsArray,
                 'cancel_url'           => $this->context->link->getAdminLink('AdminTranslations'),
@@ -2723,7 +2702,6 @@ class AdminTranslationsControllerCore extends AdminController
         $this->tpl_view_vars = array_merge(
             $this->tpl_view_vars,
             [
-                'limit_warning'        => $this->displayLimitPostWarning($this->total_expression),
                 'mod_security_warning' => Tools::apacheModExists('mod_security'),
                 'tinyMCE'              => $this->getTinyMCEForMails($this->lang_selected->iso_code),
                 'mail_content'         => $this->displayMailContent($coreMails, $subjectMail, $this->lang_selected, 'core', $this->l('Core emails')),
@@ -3245,17 +3223,15 @@ class AdminTranslationsControllerCore extends AdminController
             foreach ($arrFiles as $value) {
                 $this->findAndFillTranslations($value['files'], $value['theme'], $value['module'], $value['dir']);
             }
-
             $this->tpl_view_vars = array_merge(
                 $this->tpl_view_vars,
                 [
                     'default_theme_name'   => static::DEFAULT_THEME_NAME,
                     'count'                => $this->total_expression,
-                    'limit_warning'        => $this->displayLimitPostWarning($this->total_expression),
                     'mod_security_warning' => Tools::apacheModExists('mod_security'),
                     'textarea_sized'       => AdminTranslationsControllerCore::TEXTAREA_SIZED,
                     'cancel_url'           => $this->context->link->getAdminLink('AdminTranslations'),
-                    'modules_translations' => isset($this->modules_translations) ? $this->modules_translations : [],
+                    'theme_translations' => isset($this->modules_translations[$value['theme']]) ? $this->modules_translations[$value['theme']] : [],
                     'missing_translations' => $this->missing_translations,
                 ]
             );
@@ -3421,7 +3397,6 @@ class AdminTranslationsControllerCore extends AdminController
             $this->tpl_view_vars,
             [
                 'count'                => count($tabsArray['PDF']),
-                'limit_warning'        => $this->displayLimitPostWarning(count($tabsArray['PDF'])),
                 'mod_security_warning' => Tools::apacheModExists('mod_security'),
                 'tabsArray'            => $tabsArray,
                 'cancel_url'           => $this->context->link->getAdminLink('AdminTranslations'),

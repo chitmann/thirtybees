@@ -336,9 +336,6 @@ function formSubmit(e, button) {
     e.preventDefault();
   }
 }
-function noComma(elem) {
-  getE(elem).value = getE(elem).value.replace(new RegExp(',', 'g'), '.');
-}
 
 /* Code generator for Affiliation and vouchers */
 function gencode(size) {
@@ -1385,6 +1382,25 @@ function isCleanHtml(content) {
 
 function parseDate(date) {
   return $.datepicker.parseDate("yy-mm-dd", date);
+}
+
+/* Formatting should match Smarty function displayPriceValue. */
+function displayPriceValue(price) {
+  if (isNaN(price) || price == '') {
+    price = 0;
+  }
+
+  priceDatabase = parseFloat(parseFloat(price).toFixed(priceDatabasePrecision));
+  priceDisplay = ps_round(price, priceDisplayPrecision);
+
+  var formatted;
+  if (priceDatabase.toString() === priceDisplay.toString()) {
+    formatted = priceDisplay.toFixed(priceDisplayPrecision);
+  } else {
+    formatted = priceDatabase.toString();
+  }
+
+  return formatted;
 }
 
 function refresh_kpis() {

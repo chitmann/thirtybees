@@ -29,16 +29,29 @@
  */
 
 function formatedNumberToFloat(price, currencyFormat, currencySign) {
-  price = price.replace(currencySign, '');
-  if (currencyFormat === 1) {
-    return parseFloat(price.replace(',', '').replace(' ', ''));
-  } else if (currencyFormat === 2) {
-    return parseFloat(price.replace(' ', '').replace(',', '.'));
-  } else if (currencyFormat === 3) {
-    return parseFloat(price.replace('.', '').replace(' ', '').replace(',', '.'));
-  } else if (currencyFormat === 4) {
-    return parseFloat(price.replace(',', '').replace(' ', ''));
+  price = price.replace(currencySign, '').replace(/ /g, '');
+
+  switch (currencyFormat) {
+    case 1:
+      price = parseFloat(price.replace(/,/g, ''));
+      break;
+    case 2:
+      price = parseFloat(replace(/,/, '.'));
+      break;
+    case 3:
+      price = parseFloat(price.replace(/./g, '').replace(/,/, '.'));
+      break;
+    case 4:
+    case 6:
+      price = parseFloat(price.replace(/,/, ''));
+      break;
+    case 5:
+      price = parseFloat(price.replace(/'/, ''));
+      break;
+    default:
+      price = parseFloat(price);
   }
+
   return price;
 }
 
@@ -64,8 +77,19 @@ function formatNumber(value, numberOfDecimal, thousenSeparator, virgule) {
 }
 
 function formatCurrency(price, currencyFormat, currencySign, currencyBlank) {
-  // if you modified this function, don't forget to modify the PHP function displayPrice (in the Tools.php class)
+  // Really? It's used quite a lot.
+  //console.log('Deprecated with v1.1.0. Use displayPrice() directly.');
+
+  return displayPrice(price, currencyFormat, currencySign, currencyBlank);
+}
+
+/*
+ * This also uses global priceDisplayPrecision, so this should be right.
+ * Formatting should match Tools::displayPrice().
+ */
+function displayPrice(price, currencyFormat, currencySign, currencyBlank) {
   var currency = 'EUR';
+
   if (typeof window.currency_iso_code !== 'undefined' && window.currency_iso_code.length === 3) {
     // Should be exposed in Back Office
     currency = window.currency_iso_code;
@@ -74,8 +98,11 @@ function formatCurrency(price, currencyFormat, currencySign, currencyBlank) {
     currency = window.currency.iso_code;
   }
 
+  if (isNaN(price) || price == '') {
+    price = 0;
+  }
+
   if (typeof window.currencyModes[currency] !== 'undefined' && window.currencyModes[currency]) {
-    price = parseFloat(price).toFixed(10);
     price = ps_round(price, priceDisplayPrecision);
     var locale = document.documentElement.lang;
     if (locale.length === 5) {
@@ -95,11 +122,12 @@ function formatCurrency(price, currencyFormat, currencySign, currencyBlank) {
   }
 
   var blank = '';
-  price = parseFloat(price).toFixed(10);
   price = ps_round(price, priceDisplayPrecision);
   if (currencyBlank > 0) {
     blank = ' ';
   }
+
+  // currencyFormat is available in front office, only.
   if (currencyFormat == 1) {
     return currencySign + blank + formatNumber(price, priceDisplayPrecision, ',', '.');
   }
@@ -119,7 +147,7 @@ function formatCurrency(price, currencyFormat, currencySign, currencyBlank) {
     return (formatNumber(price, priceDisplayPrecision, '.', ',') + blank + currencySign);
   }
 
-  return price;
+  return price.toFixed(priceDisplayPrecision);
 }
 
 function ps_round_helper(value, mode) {
@@ -168,6 +196,10 @@ function ps_round(value, places) {
   }
   if (typeof(places) === 'undefined') {
     places = 2;
+  }
+  value = parseFloat(value);
+  if (isNaN(value)) {
+    return 0;
   }
 
   var method = roundMode;

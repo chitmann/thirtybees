@@ -292,7 +292,10 @@ class AdminOrdersControllerCore extends AdminController
         ];
         $paymentModules = [];
         foreach (PaymentModule::getInstalledPaymentModules() as $pModule) {
-            $paymentModules[] = Module::getInstanceById((int) $pModule['id_module']);
+            $paymentModule = Module::getInstanceById((int) $pModule['id_module']);
+            if ($paymentModule && Module::isEnabled($paymentModule->name)) {
+                $paymentModules[] = $paymentModule;
+            }
         }
 
         $this->context->smarty->assign(
@@ -2030,7 +2033,7 @@ class AdminOrdersControllerCore extends AdminController
             'returns'                      => OrderReturn::getOrdersReturn($order->id_customer, $order->id),
             'customer_thread_message'      => CustomerThread::getCustomerMessages($order->id_customer, null, $order->id),
             'orderMessages'                => OrderMessage::getOrderMessages($order->id_lang),
-            'messages'                     => Message::getMessagesByOrderId($order->id, true),
+            'messages'                     => CustomerMessage::getMessagesByOrderId($order->id, false),
             'carrier'                      => new Carrier($order->id_carrier),
             'history'                      => $history,
             'states'                       => OrderState::getOrderStates($this->context->language->id),

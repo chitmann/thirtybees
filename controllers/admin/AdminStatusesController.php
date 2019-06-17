@@ -43,6 +43,10 @@ class AdminStatusesControllerCore extends AdminController
      */
     public function __construct()
     {
+        // Retrocompatibility with < 1.1.0.
+        OrderState::installationCheck();
+        OrderReturnState::installationCheck();
+
         $this->bootstrap = true;
         $this->table = 'order_state';
         $this->className = 'OrderState';
@@ -176,6 +180,15 @@ class AdminStatusesControllerCore extends AdminController
                 'width' => 'auto',
                 'color' => 'color',
             ],
+            'active'       => [
+                'title'   => $this->l('Active'),
+                'align'   => 'text-center',
+                'active'  => 'active',
+                'type'    => 'bool',
+                'ajax'    => true,
+                'orderby' => false,
+                'class'   => 'fixed-width-sm',
+            ],
             'logo'           => [
                 'title'   => $this->l('Icon'),
                 'align'   => 'text-center',
@@ -201,8 +214,7 @@ class AdminStatusesControllerCore extends AdminController
                 'ajax'    => true,
                 'orderby' => false,
                 'class'   => 'fixed-width-sm',
-            ]
-            ,
+            ],
             'invoice'        => [
                 'title'   => $this->l('Invoice'),
                 'align'   => 'text-center',
@@ -245,6 +257,15 @@ class AdminStatusesControllerCore extends AdminController
                 'align' => 'left',
                 'width' => 'auto',
                 'color' => 'color',
+            ],
+            'active'       => [
+                'title'   => $this->l('Active'),
+                'align'   => 'text-center',
+                'active'  => 'active',
+                'type'    => 'bool',
+                'ajax'    => true,
+                'orderby' => false,
+                'class'   => 'fixed-width-sm',
             ],
         ];
     }
@@ -289,6 +310,7 @@ class AdminStatusesControllerCore extends AdminController
             $orderReturnState = new OrderReturnState((int) $idOrderReturnState);
 
             $orderReturnState->color = Tools::getValue('color');
+            $orderReturnState->active = Tools::getValue('active_on');
             $orderReturnState->name = [];
             foreach (Language::getIDs(false) as $idLang) {
                 $orderReturnState->name[$idLang] = Tools::getValue('name_'.$idLang);
@@ -333,6 +355,7 @@ class AdminStatusesControllerCore extends AdminController
             $_POST['delivery'] = (int) Tools::getValue('delivery_on');
             $_POST['pdf_delivery'] = (int) Tools::getValue('pdf_delivery_on');
             $_POST['pdf_invoice'] = (int) Tools::getValue('pdf_invoice_on');
+            $_POST['active'] = (int) Tools::getValue('active_on');
             if (!$_POST['send_email']) {
                 foreach (Language::getIDs(false) as $idLang) {
                     $_POST['template_'.$idLang] = '';
@@ -503,6 +526,17 @@ class AdminStatusesControllerCore extends AdminController
                     ],
                 ],
                 [
+                    'type'   => 'checkbox',
+                    'name'   => 'active',
+                    'values' => [
+                        'query' => [
+                            ['id' => 'on', 'name' => $this->l('Status is active for orders.'), 'val' => '1'],
+                        ],
+                        'id'    => 'id',
+                        'name'  => 'name',
+                    ],
+                ],
+                [
                     'type'    => 'select_template',
                     'label'   => $this->l('Template'),
                     'name'    => 'template',
@@ -597,6 +631,7 @@ class AdminStatusesControllerCore extends AdminController
             'delivery_on'     => $this->getFieldValue($obj, 'delivery'),
             'pdf_delivery_on' => $this->getFieldValue($obj, 'pdf_delivery'),
             'pdf_invoice_on'  => $this->getFieldValue($obj, 'pdf_invoice'),
+            'active_on'       => $this->getFieldValue($obj, 'active'),
         ];
 
         if ($this->getFieldValue($obj, 'color') !== false) {
@@ -654,6 +689,17 @@ class AdminStatusesControllerCore extends AdminController
                     'name'  => 'color',
                     'hint'  => $this->l('Status will be highlighted in this color. HTML colors only.').' "lightblue", "#CC6600")',
                 ],
+                [
+                    'type'   => 'checkbox',
+                    'name'   => 'active',
+                    'values' => [
+                        'query' => [
+                            ['id' => 'on', 'name' => $this->l('Status is active for return orders.'), 'val' => '1'],
+                        ],
+                        'id'    => 'id',
+                        'name'  => 'name',
+                    ],
+                ],
             ],
             'submit'  => [
                 'title' => $this->l('Save'),
@@ -695,13 +741,15 @@ class AdminStatusesControllerCore extends AdminController
 
         if ($orderReturnState->id) {
             $helper->fields_value = [
-                'name'  => $this->getFieldValue($orderReturnState, 'name'),
-                'color' => $this->getFieldValue($orderReturnState, 'color'),
+                'name'      => $this->getFieldValue($orderReturnState, 'name'),
+                'color'     => $this->getFieldValue($orderReturnState, 'color'),
+                'active_on' => $this->getFieldValue($orderReturnState, 'active'),
             ];
         } else {
             $helper->fields_value = [
-                'name'  => $this->getFieldValue($orderReturnState, 'name'),
-                'color' => "#ffffff",
+                'name'      => $this->getFieldValue($orderReturnState, 'name'),
+                'color'     => "#ffffff",
+                'active_on' => $this->getFieldValue($orderReturnState, 'active'),
             ];
         }
 
@@ -765,6 +813,48 @@ class AdminStatusesControllerCore extends AdminController
         $idOrderState = (int) Tools::getValue('id_order_state');
 
         $sql = 'UPDATE '._DB_PREFIX_.'order_state SET `invoice`= NOT `invoice` WHERE id_order_state='.$idOrderState;
+        $result = Db::getInstance()->execute($sql);
+
+        if ($result) {
+            $this->ajaxDie(json_encode(['success' => 1, 'text' => $this->l('The status has been updated successfully.')]));
+        } else {
+            $this->ajaxDie(json_encode(['success' => 0, 'text' => $this->l('An error occurred while updating this meta.')]));
+        }
+    }
+
+    /**
+     * Ajax process active order state
+     *
+     * @return void
+     *
+     * @since 1.1.0
+     */
+    public function ajaxProcessActiveOrderState()
+    {
+        $idOrderState = (int) Tools::getValue('id_order_state');
+
+        $sql = 'UPDATE '._DB_PREFIX_.'order_state SET `active`= NOT `active` WHERE id_order_state='.$idOrderState;
+        $result = Db::getInstance()->execute($sql);
+
+        if ($result) {
+            $this->ajaxDie(json_encode(['success' => 1, 'text' => $this->l('The status has been updated successfully.')]));
+        } else {
+            $this->ajaxDie(json_encode(['success' => 0, 'text' => $this->l('An error occurred while updating this meta.')]));
+        }
+    }
+
+    /**
+     * Ajax process active order state
+     *
+     * @return void
+     *
+     * @since 1.1.0
+     */
+    public function ajaxProcessActiveOrderReturnState()
+    {
+        $idOrderState = (int) Tools::getValue('id_order_return_state');
+
+        $sql = 'UPDATE '._DB_PREFIX_.'order_return_state SET `active`= NOT `active` WHERE id_order_return_state='.$idOrderState;
         $result = Db::getInstance()->execute($sql);
 
         if ($result) {

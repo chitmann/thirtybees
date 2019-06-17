@@ -47,6 +47,7 @@ abstract class ObjectModelCore implements Core_Foundation_Database_EntityInterfa
     const TYPE_HTML    = 6;
     const TYPE_NOTHING = 7;
     const TYPE_SQL     = 8;
+    const TYPE_PRICE   = 9;
 
     /**
      * List of data to format
@@ -60,6 +61,7 @@ abstract class ObjectModelCore implements Core_Foundation_Database_EntityInterfa
      */
     const HAS_ONE  = 1;
     const HAS_MANY = 2;
+    const BELONGS_TO_MANY = 3;
 
     // @codingStandardsIgnoreStart
     /** @var int Object ID */
@@ -480,6 +482,9 @@ abstract class ObjectModelCore implements Core_Foundation_Database_EntityInterfa
 
             case self::TYPE_FLOAT:
                 return (float) str_replace(',', '.', $value);
+
+            case self::TYPE_PRICE:
+                return round($value, _TB_PRICE_DATABASE_PRECISION_);
 
             case self::TYPE_DATE:
                 if (!$value) {
@@ -1230,7 +1235,12 @@ abstract class ObjectModelCore implements Core_Foundation_Database_EntityInterfa
 
         $key = $class.'_'.md5($field);
 
-        return ((is_array($_FIELDS) && array_key_exists($key, $_FIELDS)) ? ($htmlentities ? htmlentities($_FIELDS[$key], ENT_QUOTES, 'utf-8') : $_FIELDS[$key]) : $field);
+        if (is_array($_FIELDS) && array_key_exists($key, $_FIELDS) && $_FIELDS[$key] !== '') {
+            $str = $_FIELDS[$key];
+            return $htmlentities ? htmlentities($str, ENT_QUOTES, 'utf-8') : $str;
+        }
+
+        return $field;
     }
 
     /**

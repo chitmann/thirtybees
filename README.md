@@ -1,6 +1,5 @@
 # thirty bees
 [![Build Status](https://travis-ci.org/thirtybees/thirtybees.svg?branch=master)](https://travis-ci.org/thirtybees/thirtybees)
-[![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/thirtybees/thirtybees/badges/quality-score.png?b=master)](https://scrutinizer-ci.com/g/thirtybees/thirtybees/?branch=master)
 [![Crowdin](https://d322cqt584bo4o.cloudfront.net/thirty-bees/localized.svg)](https://crowdin.com/project/thirty-bees)
 [![Gitter](https://img.shields.io/gitter/room/thirtybees/General.svg)](https://gitter.im/thirtybees/General)
 
@@ -49,26 +48,27 @@ Native modules will be refactored to remove legacy code. Code that supports prev
 You can find the latest version of the roadmap here: https://thirtybees.com/roadmap
 
 ## Requirements
-**General server requirements:**
+Support for these general requirements (except recommendations) gets tested during installation, so one can simply try to proceed. A proceeding installation means all requirements are met.
 
 - PHP 5.5 - PHP 7.2
-- Apache, nginx or IIS
-- Windows, Linux or OS X
+- Apache or nginx
+- Linux or MacOS
 - MySQL 5.5.3+ or MariaDB 5.5+
 - PHP extensions:
   - Required:
-    - gd
     - bcmath
-    - xml (SimpleXML, DOMDocument)
+    - gd
     - json
-    - zip
-    - mysql (PDO only)
     - mbstring
+    - openssl
+    - mysql (PDO only)
+    - xml (SimpleXML, DOMDocument)
+    - zip
   - Recommended:
-    - imap
-    - curl
-    - opcache
-    - apcu/redis/memcache(d)
+    - imap (for allowing to use an IMAP server rather than PHP's built-in mail function)
+    - curl (for better handling of background HTTPS requests)
+    - opcache (not mandatory because some hosters turn this off in favor of other caching mechanisms)
+    - apcu/redis/memcache(d) (for the (currently incomplete) full page cache)
 
 ## Browser support
 

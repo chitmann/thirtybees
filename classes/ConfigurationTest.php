@@ -93,16 +93,19 @@ class ConfigurationTestCore
             ],
             'PhpVersion'              => false,
             'Fopen'                   => false,
-            'Gd'                      => false,
             'ConfigDir'               => 'config',
             'Files'                   => false,
             'MailsDir'                => 'mails',
             'MaxExecutionTime'        => false,
-            'PdoMysql'                => false,
             'MysqlVersion'            => false,
+            // PHP extensions.
             'Bcmath'                  => false,
-            'Xml'                     => false,
+            'Gd'                      => false,
             'Json'                    => false,
+            'Mbstring'                => false,
+            'OpenSSL'                 => false,
+            'PdoMysql'                => false,
+            'Xml'                     => false,
             'Zip'                     => false,
         ];
 
@@ -121,9 +124,8 @@ class ConfigurationTestCore
     public static function getDefaultTestsOp()
     {
         return [
-            'NewPhpVersion'   => false,
             'Gz'              => false,
-            'Mbstring'        => false,
+            'NewPhpVersion'   => false,
             'Tlsv12'          => false,
         ];
     }
@@ -767,6 +769,17 @@ class ConfigurationTestCore
     public static function testMbstring()
     {
         return extension_loaded('mbstring');
+    }
+
+    /**
+     * @return bool
+     *
+     * @since 1.1.0
+     */
+    public static function testOpenSSL()
+    {
+        return extension_loaded('openssl')
+               && function_exists('openssl_encrypt');
     }
 
     /**

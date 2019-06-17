@@ -25,7 +25,7 @@
 
 {* Assign product price *}
 {if ($order->getTaxCalculationMethod() == $smarty.const.PS_TAX_EXC)}
-	{assign var=product_price value=($product['unit_price_tax_excl'] + $product['ecotax'])}
+	{assign var=product_price value=$product['unit_price_tax_excl']}
 	{assign var=product_total value=$product['total_price_tax_excl']}
 {else}
 	{assign var=product_price value=$product['unit_price_tax_incl']}
@@ -53,7 +53,15 @@
 	</td>
 	{/if}
 	<td>
-		<span class="product_price_show">{displayPrice price=$product_price currency=$currency->id}</span>
+		<span class="product_price_show">
+			{displayPrice price=$product_price currency=$currency->id}
+			{if $product['ecotax'] > 0}
+				<br />
+				<small>{l s='ecotax:'}
+					{displayPrice price=$product['ecotax'] currency=$currency->id}
+				</small>
+			{/if}
+		</span>
 		{if $can_edit}
 		<div class="product_price_edit" style="display:none;">
 			<input type="hidden" name="product_id_order_detail" class="edit_product_id_order_detail" value="{$product['id_order_detail']}" />
@@ -61,7 +69,13 @@
 				<div class="fixed-width-xl">
 					<div class="input-group">
 						{if $currency->format % 2}<div class="input-group-addon">{$currency->sign} {l s='tax excl.'}</div>{/if}
-						<input type="text" name="product_price_tax_excl" class="edit_product_price_tax_excl edit_product_price" value="{$product['unit_price_tax_excl']}"/>
+                        <input type="text"
+                            name="product_price_tax_excl"
+                            class="edit_product_price_tax_excl edit_product_price"
+                            value="{displayPriceValue price=$product['unit_price_tax_excl']}"
+                            onkeyup="if (isArrowKey(event)) return;
+                                     this.value = this.value.replace(/,/g, '.');"
+                        />
 						{if !($currency->format % 2)}<div class="input-group-addon">{$currency->sign} {l s='tax excl.'}</div>{/if}
 					</div>
 				</div>
@@ -69,7 +83,13 @@
 				<div class="fixed-width-xl">
 					<div class="input-group">
 						{if $currency->format % 2}<div class="input-group-addon">{$currency->sign} {l s='tax incl.'}</div>{/if}
-						<input type="text" name="product_price_tax_incl" class="edit_product_price_tax_incl edit_product_price" value="{$product['unit_price_tax_incl']}"/>
+                        <input type="text"
+                            name="product_price_tax_incl"
+                            class="edit_product_price_tax_incl edit_product_price"
+                            value="{displayPriceValue price=$product['unit_price_tax_incl']}"
+                            onkeyup="if (isArrowKey(event)) return;
+                                     this.value = this.value.replace(/,/g, '.');"
+                        />
 						{if !($currency->format % 2)}<div class="input-group-addon">{$currency->sign} {l s='tax incl.'}</div>{/if}
 					</div>
 				</div>

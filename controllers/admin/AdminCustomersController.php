@@ -565,6 +565,19 @@ class AdminCustomersControllerCore extends AdminController
                     'disabled' => (bool) !Configuration::get('PS_CUSTOMER_OPTIN'),
                     'hint'     => $this->l('This customer will receive your ads via email.'),
                 ],
+                [
+                    'type'    => 'select',
+                    'label'   => $this->l('Language'),
+                    'name'    => 'id_lang',
+                    'options' => [
+                        'query' => Language::getLanguages(true),
+                        'id'    => 'id_lang',
+                        'name'  => 'name',
+                    ],
+                    'col'     => '4',
+                    'hint'    => $this->l('Language used by this customer.'),
+                    'desc'    => $this->l('Existing customers set this automatically by logging in.'),
+                ],
             ],
         ];
 
@@ -649,11 +662,9 @@ class AdminCustomersControllerCore extends AdminController
                 'name'  => 'website',
             ];
             $this->fields_form['input'][] = [
-                'type'   => 'text',
+                'type'   => 'price',
                 'label'  => $this->l('Allowed outstanding amount'),
                 'name'   => 'outstanding_allow_amount',
-                'hint'   => $this->l('Valid characters:').' 0-9',
-                'suffix' => $this->context->currency->sign,
             ];
             $this->fields_form['input'][] = [
                 'type'  => 'text',

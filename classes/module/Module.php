@@ -1057,7 +1057,15 @@ abstract class ModuleCore
             foreach ($modules as $name => $module) {
                 if (isset($modulesNameToCursor[mb_strtolower(strval($name))])) {
                     $moduleFromList = $modulesNameToCursor[mb_strtolower(strval($name))];
-                    if ($moduleFromList->version && Version::gt($module['version'], $moduleFromList->version)) {
+                    if ($moduleFromList->author
+                        && $moduleFromList->author === $module['author']
+                        && $moduleFromList->version
+                        && version_compare(
+                            $module['version'],
+                            $moduleFromList->version,
+                            '>'
+                        )
+                    ) {
                         $moduleFromList->version_addons = $module['version'];
                         $modulesNameToCursor[mb_strtolower(strval($name))] = $moduleFromList;
                     }
@@ -3058,8 +3066,8 @@ abstract class ModuleCore
             $this->resetCurrentSubTemplate($template, $cache_id, $compile_id);
 
             if ($result && _PS_MODE_DEV_ && !Validate::isJSON($result)) {
-                $tpl_path = $this->getTemplatePath($template);
-                $result = '<!-- START ' . $tpl_path .' -->' . $result . '<!-- END ' . $tpl_path .' -->';
+                $tplPath = $this->getTemplatePath($template);
+                $result = '<!-- START '.$tplPath.' -->'.$result.'<!-- END '.$tplPath.' -->';
             }
 
             return $result;
